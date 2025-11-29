@@ -1,5 +1,6 @@
 # Design Guidelines: Vehicle Tracking System
 
+
 ## Design Approach
 
 **Selected Framework:** Material Design (Data-Heavy Application Variant)
