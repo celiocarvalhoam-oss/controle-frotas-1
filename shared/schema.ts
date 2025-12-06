@@ -1,4 +1,198 @@
 import { z } from "zod";
+import { pgTable, text, integer, boolean, doublePrecision, timestamp, jsonb, uuid } from "drizzle-orm/pg-core";
+import { createInsertSchema, createSelectSchema } from "drizzle-zod";
+
+// ============================================
+// Drizzle ORM Table Definitions (PostgreSQL)
+// ============================================
+
+// Users table
+export const usersTable = pgTable("users", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Vehicles table
+export const vehiclesTable = pgTable("vehicles", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  licensePlate: text("license_plate").notNull(),
+  model: text("model"),
+  status: text("status", { enum: ["moving", "stopped", "idle", "offline"] }).notNull().default("offline"),
+  ignition: text("ignition", { enum: ["on", "off"] }).notNull().default("off"),
+  currentSpeed: integer("current_speed").notNull().default(0),
+  speedLimit: integer("speed_limit").notNull().default(80),
+  heading: integer("heading").notNull().default(0),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  accuracy: integer("accuracy").notNull().default(5),
+  lastUpdate: timestamp("last_update", { withTimezone: true }).defaultNow().notNull(),
+  batteryLevel: integer("battery_level"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Geofences table
+export const geofencesTable = pgTable("geofences", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull(),
+  description: text("description"),
+  type: text("type", { enum: ["circle", "polygon"] }).notNull(),
+  active: boolean("active").notNull().default(true),
+  center: jsonb("center").$type<{ latitude: number; longitude: number } | null>(),
+  radius: integer("radius"),
+  points: jsonb("points").$type<Array<{ latitude: number; longitude: number }> | null>(),
+  rules: jsonb("rules").$type<Array<{
+    type: "entry" | "exit" | "dwell" | "time_violation";
+    enabled: boolean;
+    dwellTimeMinutes?: number;
+    startTime?: string;
+    endTime?: string;
+    toleranceSeconds?: number;
+  }>>().notNull().default([]),
+  vehicleIds: jsonb("vehicle_ids").$type<string[]>().notNull().default([]),
+  lastTriggered: timestamp("last_triggered", { withTimezone: true }),
+  color: text("color"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Alerts table
+export const alertsTable = pgTable("alerts", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  type: text("type", { enum: ["speed", "geofence_entry", "geofence_exit", "geofence_dwell", "system"] }).notNull(),
+  priority: text("priority", { enum: ["critical", "warning", "info"] }).notNull(),
+  vehicleId: uuid("vehicle_id").notNull().references(() => vehiclesTable.id, { onDelete: "cascade" }),
+  vehicleName: text("vehicle_name").notNull(),
+  message: text("message").notNull(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
+  read: boolean("read").notNull().default(false),
+  latitude: doublePrecision("latitude"),
+  longitude: doublePrecision("longitude"),
+  speed: integer("speed"),
+  speedLimit: integer("speed_limit"),
+  geofenceName: text("geofence_name"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Trips table
+export const tripsTable = pgTable("trips", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  vehicleId: uuid("vehicle_id").notNull().references(() => vehiclesTable.id, { onDelete: "cascade" }),
+  startTime: timestamp("start_time", { withTimezone: true }).notNull(),
+  endTime: timestamp("end_time", { withTimezone: true }).notNull(),
+  totalDistance: integer("total_distance").notNull().default(0),
+  travelTime: integer("travel_time").notNull().default(0),
+  stoppedTime: integer("stopped_time").notNull().default(0),
+  averageSpeed: integer("average_speed").notNull().default(0),
+  maxSpeed: integer("max_speed").notNull().default(0),
+  stopsCount: integer("stops_count").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// Location points table (for trip history)
+export const locationPointsTable = pgTable("location_points", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tripId: uuid("trip_id").notNull().references(() => tripsTable.id, { onDelete: "cascade" }),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  speed: integer("speed").notNull().default(0),
+  heading: integer("heading").notNull().default(0),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
+  accuracy: doublePrecision("accuracy"),
+});
+
+// Route events table
+export const routeEventsTable = pgTable("route_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  tripId: uuid("trip_id").notNull().references(() => tripsTable.id, { onDelete: "cascade" }),
+  type: text("type", { enum: ["departure", "arrival", "stop", "speed_violation", "geofence_entry", "geofence_exit"] }).notNull(),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
+  duration: integer("duration"),
+  speed: integer("speed"),
+  speedLimit: integer("speed_limit"),
+  geofenceName: text("geofence_name"),
+  address: text("address"),
+});
+
+// Speed violations table
+export const speedViolationsTable = pgTable("speed_violations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  vehicleId: uuid("vehicle_id").notNull().references(() => vehiclesTable.id, { onDelete: "cascade" }),
+  vehicleName: text("vehicle_name").notNull(),
+  speed: integer("speed").notNull(),
+  speedLimit: integer("speed_limit").notNull(),
+  excessSpeed: integer("excess_speed").notNull(),
+  timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+  duration: integer("duration").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// ============================================
+// Drizzle-Zod Schemas (Auto-generated)
+// ============================================
+
+export const insertUserDbSchema = createInsertSchema(usersTable);
+export const selectUserDbSchema = createSelectSchema(usersTable);
+
+export const insertVehicleDbSchema = createInsertSchema(vehiclesTable);
+export const selectVehicleDbSchema = createSelectSchema(vehiclesTable);
+
+export const insertGeofenceDbSchema = createInsertSchema(geofencesTable);
+export const selectGeofenceDbSchema = createSelectSchema(geofencesTable);
+
+export const insertAlertDbSchema = createInsertSchema(alertsTable);
+export const selectAlertDbSchema = createSelectSchema(alertsTable);
+
+export const insertTripDbSchema = createInsertSchema(tripsTable);
+export const selectTripDbSchema = createSelectSchema(tripsTable);
+
+export const insertLocationPointDbSchema = createInsertSchema(locationPointsTable);
+export const selectLocationPointDbSchema = createSelectSchema(locationPointsTable);
+
+export const insertRouteEventDbSchema = createInsertSchema(routeEventsTable);
+export const selectRouteEventDbSchema = createSelectSchema(routeEventsTable);
+
+export const insertSpeedViolationDbSchema = createInsertSchema(speedViolationsTable);
+export const selectSpeedViolationDbSchema = createSelectSchema(speedViolationsTable);
+
+// ============================================
+// TypeScript Types (from Drizzle tables)
+// ============================================
+
+export type UserDb = typeof usersTable.$inferSelect;
+export type InsertUserDb = typeof usersTable.$inferInsert;
+
+export type VehicleDb = typeof vehiclesTable.$inferSelect;
+export type InsertVehicleDb = typeof vehiclesTable.$inferInsert;
+
+export type GeofenceDb = typeof geofencesTable.$inferSelect;
+export type InsertGeofenceDb = typeof geofencesTable.$inferInsert;
+
+export type AlertDb = typeof alertsTable.$inferSelect;
+export type InsertAlertDb = typeof alertsTable.$inferInsert;
+
+export type TripDb = typeof tripsTable.$inferSelect;
+export type InsertTripDb = typeof tripsTable.$inferInsert;
+
+export type LocationPointDb = typeof locationPointsTable.$inferSelect;
+export type InsertLocationPointDb = typeof locationPointsTable.$inferInsert;
+
+export type RouteEventDb = typeof routeEventsTable.$inferSelect;
+export type InsertRouteEventDb = typeof routeEventsTable.$inferInsert;
+
+export type SpeedViolationDb = typeof speedViolationsTable.$inferSelect;
+export type InsertSpeedViolationDb = typeof speedViolationsTable.$inferInsert;
+
+// ============================================
+// Application Types (Zod schemas - for API validation)
+// ============================================
 
 export type VehicleStatus = "moving" | "stopped" | "idle" | "offline";
 export type IgnitionStatus = "on" | "off";
@@ -163,12 +357,6 @@ export const vehicleStatsSchema = z.object({
 });
 
 export type VehicleStats = z.infer<typeof vehicleStatsSchema>;
-
-export const users = {
-  id: "",
-  username: "",
-  password: "",
-};
 
 export const insertUserSchema = z.object({
   username: z.string(),

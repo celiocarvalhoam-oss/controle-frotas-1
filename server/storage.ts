@@ -608,4 +608,22 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { isSupabaseConfigured } from "./supabase";
+import { SupabaseStorage } from "./supabase-storage";
+
+/**
+ * Cria a instância de storage apropriada baseada na configuração do ambiente.
+ * - Se SUPABASE_URL e SUPABASE_ANON_KEY estiverem configurados: usa SupabaseStorage
+ * - Caso contrário: usa MemStorage (dados em memória para desenvolvimento)
+ */
+function createStorage(): IStorage & { onVehicleUpdate: (callback: (vehicles: Vehicle[]) => void) => () => void } {
+  if (isSupabaseConfigured()) {
+    console.log("🔌 Usando Supabase como backend de armazenamento");
+    return new SupabaseStorage();
+  }
+  
+  console.log("💾 Usando armazenamento em memória (dados de demonstração)");
+  return new MemStorage();
+}
+
+export const storage = createStorage();
