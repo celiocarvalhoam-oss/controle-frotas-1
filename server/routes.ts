@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { WebSocketServer, WebSocket } from "ws";
 import { storage } from "./storage";
-import { insertVehicleSchema, insertGeofenceSchema, insertAlertSchema } from "@shared/schema";
+import { insertVehicleSchema, insertGeofenceSchema, insertAlertSchema, trackingDataSchema } from "@shared/schema";
 
 const clients = new Set<WebSocket>();
 
@@ -238,6 +238,35 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/trips", async (req, res) => {
+    try {
+      const { vehicleId, startTime, endTime, totalDistance, travelTime, stoppedTime, averageSpeed, maxSpeed, stopsCount, points, events } = req.body;
+      
+      if (!vehicleId || !startTime || !endTime) {
+        return res.status(400).json({ error: "vehicleId, startTime and endTime are required" });
+      }
+      
+      const trip = await storage.createTrip({
+        vehicleId,
+        startTime,
+        endTime,
+        totalDistance: totalDistance || 0,
+        travelTime: travelTime || 0,
+        stoppedTime: stoppedTime || 0,
+        averageSpeed: averageSpeed || 0,
+        maxSpeed: maxSpeed || 0,
+        stopsCount: stopsCount || 0,
+        points: points || [],
+        events: events || [],
+      });
+      
+      res.status(201).json(trip);
+    } catch (error) {
+      console.error("Error creating trip:", error);
+      res.status(500).json({ error: "Failed to create trip" });
+    }
+  });
+
   app.get("/api/reports/violations", async (req, res) => {
     try {
       const { startDate, endDate } = req.query;
@@ -263,6 +292,70 @@ export async function registerRoutes(
       res.json(stats);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch speed stats" });
+    }
+  });
+
+  // ============================================
+  // Tracking API - Atualização de localização em tempo real
+  // ============================================
+
+  app.post("/api/tracking", async (req, res) => {
+    try {
+      // Valida os dados de entrada
+      const parsed = trackingDataSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ 
+          error: "Dados inválidos", 
+          details: parsed.error.errors 
+        });
+      }
+
+      const { licensePlate, latitude, longitude, speed } = parsed.data;
+
+      // Busca o veículo pela placa
+      const vehicle = await storage.getVehicleByLicensePlate(licensePlate);
+      if (!vehicle) {
+        return res.status(404).json({ 
+          error: "Veículo não encontrado",
+          message: `Nenhum veículo cadastrado com a placa ${licensePlate}`
+        });
+      }
+
+      // Determina o status do veículo baseado na velocidade
+      let status: "moving" | "stopped" | "idle" = "stopped";
+      let ignition: "on" | "off" = "on";
+      
+      if (speed > 0) {
+        status = "moving";
+        ignition = "on";
+      } else {
+        // Se a velocidade é 0, verifica há quanto tempo está parado
+        status = "stopped";
+        ignition = "on"; // Assume que a ignição está ligada se está enviando dados
+      }
+
+      // Atualiza o veículo com os novos dados
+      const updatedVehicle = await storage.updateVehicle(vehicle.id, {
+        latitude,
+        longitude,
+        currentSpeed: Math.round(speed),
+        status,
+        ignition,
+        lastUpdate: new Date().toISOString(),
+      });
+
+      if (!updatedVehicle) {
+        return res.status(500).json({ error: "Falha ao atualizar veículo" });
+      }
+
+      res.json({
+        success: true,
+        message: "Localização atualizada com sucesso",
+        vehicle: updatedVehicle,
+      });
+    } catch (error) {
+      console.error("Erro no endpoint de tracking:", error);
+      res.status(500).json({ error: "Falha ao processar dados de rastreamento" });
     }
   });
 

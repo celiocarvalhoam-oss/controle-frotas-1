@@ -1,14 +1,13 @@
-import { useState } from "react";
 import { 
   X, MapPin, Gauge, Navigation, Radio, Battery, Clock, 
-  History, Shield, AlertTriangle, Bell, Activity, Settings
+  History, Shield, AlertTriangle, Bell, Activity, Settings,
+  Target, Zap, Navigation2, TrendingUp, Compass
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import type { Vehicle, Alert } from "@shared/schema";
 import { Link } from "wouter";
@@ -36,26 +35,37 @@ export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, 
     return date.toLocaleDateString("pt-BR");
   };
 
-  const getStatusColor = (status: Vehicle["status"]) => {
+  const getStatusConfig = (status: Vehicle["status"]) => {
     switch (status) {
-      case "moving": return "text-status-online";
-      case "stopped": return "text-status-away";
-      case "idle": return "text-status-away";
-      case "offline": return "text-status-offline";
+      case "moving": 
+        return { 
+          color: "bg-green-500", 
+          label: "Em Movimento",
+          textColor: "text-green-600 dark:text-green-400",
+          bgColor: "bg-green-50 dark:bg-green-950/30"
+        };
+      case "stopped": 
+        return { 
+          color: "bg-amber-500", 
+          label: "Parado",
+          textColor: "text-amber-600 dark:text-amber-400",
+          bgColor: "bg-amber-50 dark:bg-amber-950/30"
+        };
+      case "idle": 
+        return { 
+          color: "bg-amber-500", 
+          label: "Ocioso",
+          textColor: "text-amber-600 dark:text-amber-400",
+          bgColor: "bg-amber-50 dark:bg-amber-950/30"
+        };
+      case "offline": 
+        return { 
+          color: "bg-slate-400 dark:bg-slate-600", 
+          label: "Offline",
+          textColor: "text-muted-foreground",
+          bgColor: "bg-muted/50"
+        };
     }
-  };
-
-  const getStatusLabel = (status: Vehicle["status"]) => {
-    switch (status) {
-      case "moving": return "Em Movimento";
-      case "stopped": return "Parado";
-      case "idle": return "Ocioso";
-      case "offline": return "Offline";
-    }
-  };
-
-  const getIgnitionLabel = (ignition: Vehicle["ignition"]) => {
-    return ignition === "on" ? "Ligada" : "Desligada";
   };
 
   const getAlertIcon = (type: Alert["type"]) => {
@@ -70,165 +80,251 @@ export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, 
 
   const getAlertColor = (priority: Alert["priority"]) => {
     switch (priority) {
-      case "critical": return "text-destructive";
+      case "critical": return "text-red-500";
       case "warning": return "text-amber-500";
       default: return "text-primary";
     }
   };
 
+  const statusConfig = getStatusConfig(vehicle.status);
+  const hasSpeedAlert = vehicle.currentSpeed > vehicle.speedLimit;
+
   return (
-    <div className="flex flex-col h-full bg-sidebar">
-      <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
-        <div>
-          <h2 className="font-semibold text-lg">{vehicle.name}</h2>
-          <p className="text-sm text-muted-foreground">{vehicle.licensePlate}</p>
+    <div className="flex flex-col h-full bg-sidebar animate-slide-in-right">
+      {/* Header */}
+      <div className="p-4 border-b border-sidebar-border">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <h2 className="font-bold text-lg truncate">{vehicle.name}</h2>
+              <div className={cn(
+                "w-2.5 h-2.5 rounded-full",
+                statusConfig.color,
+                vehicle.status === "moving" && "animate-pulse"
+              )} />
+            </div>
+            <p className="text-sm text-muted-foreground font-medium">{vehicle.licensePlate}</p>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onClose} 
+            className="rounded-xl hover:bg-muted"
+            data-testid="button-close-detail"
+          >
+            <X className="h-5 w-5" />
+          </Button>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} data-testid="button-close-detail">
-          <X className="h-5 w-5" />
-        </Button>
+        
+        {/* Status badge */}
+        <div className={cn(
+          "mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium",
+          statusConfig.bgColor,
+          statusConfig.textColor
+        )}>
+          <Activity className="h-3.5 w-3.5" />
+          {statusConfig.label}
+        </div>
       </div>
 
       <Tabs defaultValue="details" className="flex-1 flex flex-col">
-        <TabsList className="mx-4 mt-2 grid w-auto grid-cols-3">
-          <TabsTrigger value="details" data-testid="tab-details">Detalhes</TabsTrigger>
-          <TabsTrigger value="alerts" data-testid="tab-alerts" className="relative">
+        <TabsList className="mx-4 mt-3 grid w-auto grid-cols-3 h-10 p-1 bg-muted/50 rounded-xl">
+          <TabsTrigger value="details" className="rounded-lg text-xs font-medium" data-testid="tab-details">
+            Detalhes
+          </TabsTrigger>
+          <TabsTrigger value="alerts" className="rounded-lg text-xs font-medium relative" data-testid="tab-alerts">
             Alertas
             {unreadAlerts.length > 0 && (
-              <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-destructive text-destructive-foreground text-[10px] flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 h-4 min-w-4 px-1 rounded-full bg-red-500 text-white text-[10px] flex items-center justify-center font-bold">
                 {unreadAlerts.length}
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="activity" data-testid="tab-activity">Atividade</TabsTrigger>
+          <TabsTrigger value="activity" className="rounded-lg text-xs font-medium" data-testid="tab-activity">
+            Atividade
+          </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="details" className="flex-1 mt-0 p-4 space-y-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <Gauge className="h-3 w-3" /> Velocidade
-                  </div>
-                  <div className={cn(
-                    "text-2xl font-mono font-bold",
-                    vehicle.currentSpeed > vehicle.speedLimit && "text-destructive"
-                  )}>
-                    {vehicle.currentSpeed} <span className="text-sm font-normal">km/h</span>
-                  </div>
-                  {vehicle.currentSpeed > vehicle.speedLimit && (
-                    <div className="text-xs text-destructive flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" />
-                      Limite: {vehicle.speedLimit} km/h
+        <TabsContent value="details" className="flex-1 mt-0 overflow-auto scrollbar-thin">
+          <div className="p-4 space-y-4">
+            {/* Speed Card - Hero */}
+            <Card className={cn(
+              "overflow-hidden border-0",
+              hasSpeedAlert 
+                ? "bg-gradient-to-br from-red-500 to-red-600 text-white" 
+                : "bg-gradient-to-br from-primary to-blue-600 text-white"
+            )}>
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-xs uppercase tracking-wide opacity-80 flex items-center gap-1 mb-1">
+                      <Gauge className="h-3.5 w-3.5" /> Velocidade Atual
                     </div>
-                  )}
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <Navigation className="h-3 w-3" /> Direção
-                  </div>
-                  <div className="text-2xl font-mono font-bold">
-                    {vehicle.heading}°
-                  </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <MapPin className="h-3 w-3" /> Precisão GPS
-                  </div>
-                  <div className="text-lg font-mono">
-                    ±{vehicle.accuracy}m
-                  </div>
-                </div>
-                
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <Radio className="h-3 w-3" /> Ignição
-                  </div>
-                  <div className="text-lg">
-                    <Badge variant={vehicle.ignition === "on" ? "default" : "secondary"}>
-                      {getIgnitionLabel(vehicle.ignition)}
-                    </Badge>
-                  </div>
-                </div>
-                
-                {vehicle.batteryLevel !== undefined && (
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                      <Battery className="h-3 w-3" /> Bateria
+                    <div className="text-4xl font-bold font-mono tracking-tight">
+                      {vehicle.currentSpeed}
+                      <span className="text-lg font-normal ml-1 opacity-80">km/h</span>
                     </div>
-                    <div className="text-lg font-mono">
-                      {vehicle.batteryLevel}%
-                    </div>
+                    {hasSpeedAlert && (
+                      <div className="flex items-center gap-1.5 mt-2 text-xs">
+                        <AlertTriangle className="h-4 w-4" />
+                        <span>Acima do limite ({vehicle.speedLimit} km/h)</span>
+                      </div>
+                    )}
                   </div>
+                  <div className="text-right">
+                    <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center">
+                      <Navigation2 
+                        className="h-8 w-8 transition-transform duration-500" 
+                        style={{ transform: `rotate(${vehicle.heading}deg)` }}
+                      />
+                    </div>
+                    <div className="text-xs mt-2 opacity-80 font-mono">{vehicle.heading}° Direção</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-3">
+              <Card className="bg-card/50 border-card-border">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                    <MapPin className="h-4 w-4" />
+                    <span className="text-xs font-medium">Precisão GPS</span>
+                  </div>
+                  <div className="text-xl font-bold font-mono">
+                    ±{vehicle.accuracy}<span className="text-sm font-normal text-muted-foreground ml-0.5">m</span>
+                  </div>
+                </CardContent>
+              </Card>
+              
+              <Card className="bg-card/50 border-card-border">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                    <Radio className="h-4 w-4" />
+                    <span className="text-xs font-medium">Ignição</span>
+                  </div>
+                  <Badge 
+                    variant={vehicle.ignition === "on" ? "default" : "secondary"}
+                    className={cn(
+                      "text-sm",
+                      vehicle.ignition === "on" && "bg-green-500 hover:bg-green-600"
+                    )}
+                  >
+                    {vehicle.ignition === "on" ? "Ligada" : "Desligada"}
+                  </Badge>
+                </CardContent>
+              </Card>
+              
+              {vehicle.batteryLevel !== undefined && (
+                <Card className="bg-card/50 border-card-border">
+                  <CardContent className="p-3">
+                    <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                      <Battery className="h-4 w-4" />
+                      <span className="text-xs font-medium">Bateria</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+                        <div 
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            vehicle.batteryLevel > 50 ? "bg-green-500" :
+                            vehicle.batteryLevel > 20 ? "bg-amber-500" : "bg-red-500"
+                          )}
+                          style={{ width: `${vehicle.batteryLevel}%` }}
+                        />
+                      </div>
+                      <span className="text-sm font-bold font-mono">{vehicle.batteryLevel}%</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+              
+              <Card className="bg-card/50 border-card-border">
+                <CardContent className="p-3">
+                  <div className="flex items-center gap-2 text-muted-foreground mb-2">
+                    <Target className="h-4 w-4" />
+                    <span className="text-xs font-medium">Limite</span>
+                  </div>
+                  <div className="text-xl font-bold font-mono">
+                    {vehicle.speedLimit}<span className="text-sm font-normal text-muted-foreground ml-0.5">km/h</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Last update */}
+            <div className="flex items-center gap-2 text-xs text-muted-foreground px-1">
+              <Clock className="h-3.5 w-3.5" />
+              <span>Última atualização: <span className="font-medium text-foreground">{formatTime(vehicle.lastUpdate)}</span></span>
+            </div>
+
+            {/* Actions */}
+            <div className="space-y-2 pt-2">
+              <Button
+                onClick={onFollowVehicle}
+                variant={isFollowing ? "default" : "outline"}
+                className={cn(
+                  "w-full justify-start gap-3 h-11 rounded-xl font-medium",
+                  isFollowing && "bg-primary shadow-md"
                 )}
-                
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground uppercase tracking-wide flex items-center gap-1">
-                    <Activity className="h-3 w-3" /> Status
-                  </div>
-                  <div className={cn("text-lg font-medium", getStatusColor(vehicle.status))}>
-                    {getStatusLabel(vehicle.status)}
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <div className="text-xs text-muted-foreground flex items-center gap-1">
-            <Clock className="h-3 w-3" />
-            Última atualização: {formatTime(vehicle.lastUpdate)}
-          </div>
-
-          <Separator />
-
-          <div className="space-y-2">
-            <Button
-              onClick={onFollowVehicle}
-              variant={isFollowing ? "default" : "outline"}
-              className="w-full justify-start gap-2"
-              data-testid="button-follow-vehicle"
-            >
-              <Navigation className="h-4 w-4" />
-              {isFollowing ? "Seguindo veículo" : "Seguir veículo"}
-            </Button>
-            
-            <Link href={`/history?vehicleId=${vehicle.id}`}>
-              <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-view-history">
-                <History className="h-4 w-4" />
-                Ver histórico
+                data-testid="button-follow-vehicle"
+              >
+                <Navigation className="h-4 w-4" />
+                {isFollowing ? "Seguindo veículo..." : "Seguir veículo"}
+                {isFollowing && <Zap className="h-4 w-4 ml-auto animate-pulse text-yellow-300" />}
               </Button>
-            </Link>
-            
-            <Link href={`/geofences?vehicleId=${vehicle.id}`}>
-              <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-create-geofence">
-                <Shield className="h-4 w-4" />
-                Criar geofence
+              
+              <Link href={`/history?vehicleId=${vehicle.id}`}>
+                <Button variant="outline" className="w-full justify-start gap-3 h-11 rounded-xl" data-testid="button-view-history">
+                  <History className="h-4 w-4" />
+                  Ver histórico de trajetos
+                </Button>
+              </Link>
+              
+              <Link href={`/geofences?vehicleId=${vehicle.id}`}>
+                <Button variant="outline" className="w-full justify-start gap-3 h-11 rounded-xl" data-testid="button-create-geofence">
+                  <Shield className="h-4 w-4" />
+                  Criar cerca virtual
+                </Button>
+              </Link>
+              
+              <Button variant="outline" className="w-full justify-start gap-3 h-11 rounded-xl" data-testid="button-set-speed-limit">
+                <Settings className="h-4 w-4" />
+                Configurar limite de velocidade
               </Button>
-            </Link>
-            
-            <Button variant="outline" className="w-full justify-start gap-2" data-testid="button-set-speed-limit">
-              <Settings className="h-4 w-4" />
-              Definir limite de velocidade
-            </Button>
+            </div>
           </div>
         </TabsContent>
 
         <TabsContent value="alerts" className="flex-1 mt-0">
-          <ScrollArea className="h-full">
+          <ScrollArea className="h-full scrollbar-thin">
             <div className="p-4 space-y-2">
               {vehicleAlerts.length === 0 ? (
-                <div className="text-center py-8">
-                  <Bell className="h-12 w-12 mx-auto text-muted-foreground/50 mb-2" />
-                  <p className="text-sm text-muted-foreground">Nenhum alerta para este veículo</p>
+                <div className="text-center py-12">
+                  <div className="w-16 h-16 mx-auto mb-4 rounded-2xl bg-muted/50 flex items-center justify-center">
+                    <Bell className="h-8 w-8 text-muted-foreground/50" />
+                  </div>
+                  <p className="text-sm font-medium text-muted-foreground">Nenhum alerta</p>
+                  <p className="text-xs text-muted-foreground/70 mt-1">Este veículo está operando normalmente</p>
                 </div>
               ) : (
-                vehicleAlerts.map(alert => (
-                  <Card key={alert.id} className={cn(!alert.read && "border-l-2 border-l-primary")}>
+                vehicleAlerts.map((alert, index) => (
+                  <Card 
+                    key={alert.id} 
+                    className={cn(
+                      "animate-fade-in border-card-border",
+                      !alert.read && "border-l-4 border-l-primary bg-primary/5"
+                    )}
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                  >
                     <CardContent className="p-3">
                       <div className="flex items-start gap-3">
-                        <div className={cn("mt-0.5", getAlertColor(alert.priority))}>
+                        <div className={cn(
+                          "mt-0.5 p-1.5 rounded-lg",
+                          getAlertColor(alert.priority),
+                          "bg-current/10"
+                        )}>
                           {getAlertIcon(alert.type)}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -238,7 +334,7 @@ export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, 
                           </p>
                         </div>
                         {!alert.read && (
-                          <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0" />
+                          <div className="h-2 w-2 rounded-full bg-primary flex-shrink-0 mt-2" />
                         )}
                       </div>
                     </CardContent>
@@ -250,44 +346,41 @@ export function VehicleDetailPanel({ vehicle, alerts, onClose, onFollowVehicle, 
         </TabsContent>
 
         <TabsContent value="activity" className="flex-1 mt-0">
-          <ScrollArea className="h-full">
-            <div className="p-4 space-y-3">
-              <div className="text-sm text-muted-foreground">Últimas 5 atividades</div>
-              <div className="space-y-2">
-                <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
-                  <div className="h-2 w-2 rounded-full bg-status-online" />
-                  <div className="flex-1">
-                    <p className="text-sm">Iniciou movimento</p>
-                    <p className="text-xs text-muted-foreground">Há 5 minutos</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
-                  <div className="h-2 w-2 rounded-full bg-status-away" />
-                  <div className="flex-1">
-                    <p className="text-sm">Parou por 12 minutos</p>
-                    <p className="text-xs text-muted-foreground">Há 17 minutos</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
-                  <div className="h-2 w-2 rounded-full bg-status-online" />
-                  <div className="flex-1">
-                    <p className="text-sm">Entrou em área "Depósito"</p>
-                    <p className="text-xs text-muted-foreground">Há 30 minutos</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
-                  <div className="h-2 w-2 rounded-full bg-destructive" />
-                  <div className="flex-1">
-                    <p className="text-sm">Excesso de velocidade: 85 km/h</p>
-                    <p className="text-xs text-muted-foreground">Há 45 minutos</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-2 rounded-md bg-muted/50">
-                  <div className="h-2 w-2 rounded-full bg-status-online" />
-                  <div className="flex-1">
-                    <p className="text-sm">Ignição ligada</p>
-                    <p className="text-xs text-muted-foreground">Há 1 hora</p>
-                  </div>
+          <ScrollArea className="h-full scrollbar-thin">
+            <div className="p-4">
+              <div className="text-xs text-muted-foreground mb-4 flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Últimas atividades registradas
+              </div>
+              <div className="relative">
+                {/* Timeline line */}
+                <div className="absolute left-[11px] top-3 bottom-3 w-0.5 bg-border" />
+                
+                <div className="space-y-4">
+                  {[
+                    { status: "moving", text: "Iniciou movimento", time: "5 minutos", color: "bg-green-500" },
+                    { status: "stopped", text: "Parou por 12 minutos", time: "17 minutos", color: "bg-amber-500" },
+                    { status: "geofence", text: "Entrou em área 'Depósito'", time: "30 minutos", color: "bg-blue-500" },
+                    { status: "alert", text: "Excesso de velocidade: 85 km/h", time: "45 minutos", color: "bg-red-500" },
+                    { status: "ignition", text: "Ignição ligada", time: "1 hora", color: "bg-green-500" },
+                  ].map((item, index) => (
+                    <div 
+                      key={index} 
+                      className="flex items-start gap-4 animate-fade-in"
+                      style={{ animationDelay: `${index * 0.05}s` }}
+                    >
+                      <div className={cn(
+                        "w-6 h-6 rounded-full flex items-center justify-center z-10 ring-4 ring-sidebar",
+                        item.color
+                      )}>
+                        <div className="w-2 h-2 rounded-full bg-white" />
+                      </div>
+                      <div className="flex-1 pb-4">
+                        <p className="text-sm font-medium">{item.text}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Há {item.time}</p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>

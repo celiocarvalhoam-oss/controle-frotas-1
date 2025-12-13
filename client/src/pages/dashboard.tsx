@@ -65,8 +65,9 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex h-full" data-testid="dashboard-page">
-      <div className="w-80 flex-shrink-0 border-r border-sidebar-border bg-sidebar">
+    <div className="flex h-full bg-background" data-testid="dashboard-page">
+      {/* Vehicle List Sidebar */}
+      <div className="w-80 xl:w-96 flex-shrink-0 border-r border-border/50 bg-sidebar shadow-sm">
         <VehicleList
           vehicles={vehicles}
           selectedVehicleId={selectedVehicle?.id}
@@ -75,6 +76,7 @@ export default function Dashboard() {
         />
       </div>
       
+      {/* Map Container */}
       <div className="flex-1 relative">
         <FleetMap
           vehicles={vehicles}
@@ -86,8 +88,9 @@ export default function Dashboard() {
         />
       </div>
       
+      {/* Vehicle Detail Panel */}
       {selectedVehicle && (
-        <div className="w-[360px] flex-shrink-0 border-l border-sidebar-border">
+        <div className="w-[380px] flex-shrink-0 border-l border-border/50 shadow-lg">
           <VehicleDetailPanel
             vehicle={selectedVehicle}
             alerts={alerts}

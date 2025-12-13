@@ -1,5 +1,5 @@
 import { getSupabaseClient, type Database } from "./supabase";
-import type { IStorage } from "./storage";
+import type { IStorage, InsertTrip } from "./storage";
 import type {
   Vehicle,
   InsertVehicle,
@@ -251,6 +251,25 @@ export class SupabaseStorage implements IStorage {
     return data ? dbVehicleToVehicle(data) : undefined;
   }
 
+  async getVehicleByLicensePlate(licensePlate: string): Promise<Vehicle | undefined> {
+    const supabase = getSupabaseClient();
+    const { data, error } = await supabase
+      .from("vehicles")
+      .select("*")
+      .ilike("license_plate", licensePlate)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") {
+        return undefined; // Not found
+      }
+      console.error("Erro ao buscar veículo por placa:", error);
+      throw new Error("Falha ao buscar veículo por placa");
+    }
+
+    return data ? dbVehicleToVehicle(data) : undefined;
+  }
+
   async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
     const supabase = getSupabaseClient();
     const { data, error } = await supabase
@@ -313,7 +332,19 @@ export class SupabaseStorage implements IStorage {
 
   async deleteVehicle(id: string): Promise<boolean> {
     const supabase = getSupabaseClient();
-    const { error, count } = await supabase
+    
+    // Primeiro verifica se o veículo existe
+    const { data: existing } = await supabase
+      .from("vehicles")
+      .select("id")
+      .eq("id", id)
+      .single();
+
+    if (!existing) {
+      return false;
+    }
+
+    const { error } = await supabase
       .from("vehicles")
       .delete()
       .eq("id", id);
@@ -323,11 +354,8 @@ export class SupabaseStorage implements IStorage {
       throw new Error("Falha ao deletar veículo");
     }
 
-    if (count && count > 0) {
-      await this.notifyVehicleUpdate();
-      return true;
-    }
-    return false;
+    await this.notifyVehicleUpdate();
+    return true;
   }
 
   // ============================================
@@ -630,6 +658,97 @@ export class SupabaseStorage implements IStorage {
     );
 
     return trips;
+  }
+
+  async createTrip(trip: InsertTrip): Promise<Trip> {
+    const supabase = getSupabaseClient();
+
+    // Insere a viagem principal
+    const { data: tripData, error: tripError } = await supabase
+      .from("trips")
+      .insert({
+        vehicle_id: trip.vehicleId,
+        start_time: trip.startTime,
+        end_time: trip.endTime,
+        total_distance: trip.totalDistance,
+        travel_time: trip.travelTime,
+        stopped_time: trip.stoppedTime,
+        average_speed: trip.averageSpeed,
+        max_speed: trip.maxSpeed,
+        stops_count: trip.stopsCount,
+      })
+      .select()
+      .single();
+
+    if (tripError) {
+      console.error("Erro ao criar viagem:", tripError);
+      throw new Error("Falha ao criar viagem");
+    }
+
+    const tripId = tripData.id;
+
+    // Insere os pontos de localização
+    if (trip.points && trip.points.length > 0) {
+      const locationPoints = trip.points.map((p) => ({
+        trip_id: tripId,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        speed: p.speed,
+        heading: p.heading,
+        timestamp: p.timestamp,
+        accuracy: p.accuracy ?? null,
+      }));
+
+      const { error: pointsError } = await supabase
+        .from("location_points")
+        .insert(locationPoints);
+
+      if (pointsError) {
+        console.error("Erro ao inserir pontos de localização:", pointsError);
+        // Não lança erro para não interromper o fluxo, mas loga o problema
+      }
+    }
+
+    // Insere os eventos da rota
+    if (trip.events && trip.events.length > 0) {
+      const routeEvents = trip.events.map((e) => ({
+        trip_id: tripId,
+        type: e.type,
+        latitude: e.latitude,
+        longitude: e.longitude,
+        timestamp: e.timestamp,
+        duration: e.duration ?? null,
+        speed: e.speed ?? null,
+        speed_limit: e.speedLimit ?? null,
+        geofence_name: e.geofenceName ?? null,
+        address: e.address ?? null,
+      }));
+
+      const { error: eventsError } = await supabase
+        .from("route_events")
+        .insert(routeEvents);
+
+      if (eventsError) {
+        console.error("Erro ao inserir eventos da rota:", eventsError);
+        // Não lança erro para não interromper o fluxo, mas loga o problema
+      }
+    }
+
+    // Retorna a viagem criada com os pontos e eventos
+    return {
+      id: tripId,
+      vehicleId: tripData.vehicle_id,
+      startTime: tripData.start_time,
+      endTime: tripData.end_time,
+      totalDistance: tripData.total_distance,
+      travelTime: tripData.travel_time,
+      stoppedTime: tripData.stopped_time,
+      averageSpeed: tripData.average_speed,
+      maxSpeed: tripData.max_speed,
+      stopsCount: tripData.stops_count,
+      points: trip.points,
+      events: trip.events,
+    };
   }
 
   // ============================================

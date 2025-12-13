@@ -8,15 +8,27 @@
     <meta property="og:title" content="FleetTrack - Sistema de Rastreamento Veicular" />
     <meta property="og:description" content="Monitore sua frota em tempo real com alertas inteligentes, histórico de trajetos e controle de velocidade." />
     <meta property="og:type" content="website" />
+    <meta name="theme-color" content="#2563eb" />
     <title>FleetTrack - Sistema de Rastreamento Veicular</title>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+    <style>
+      /* Critical CSS - prevent FOUC */
+      html { background: #f8fafc; }
+      html.dark { background: #0f172a; }
+      body { opacity: 0; transition: opacity 0.2s ease-in; }
+      body.loaded { opacity: 1; }
+    </style>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Prevent FOUC
+      document.body.classList.add('loaded');
+    </script>
   </body>
 </html>

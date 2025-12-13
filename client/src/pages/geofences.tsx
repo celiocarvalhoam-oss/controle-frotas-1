@@ -222,7 +222,7 @@ export default function GeofencesPage() {
       <div className="w-[400px] flex-shrink-0 border-r border-border bg-sidebar flex flex-col">
         <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
           <h2 className="font-semibold text-lg">Geofences</h2>
-          <Button onClick={() => setIsCreateOpen(true)} className="gap-2" data-testid="button-create-geofence">
+          <Button onClick={() => setIsCreateOpen(true)} className="gap-2 bg-green-600 hover:bg-green-700 border-green-700 text-white" data-testid="button-create-geofence">
             <Plus className="h-4 w-4" />
             Criar
           </Button>

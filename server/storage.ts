@@ -6,9 +6,24 @@ import type {
   Trip, SpeedViolation, VehicleStats
 } from "@shared/schema";
 
+export interface InsertTrip {
+  vehicleId: string;
+  startTime: string;
+  endTime: string;
+  totalDistance: number;
+  travelTime: number;
+  stoppedTime: number;
+  averageSpeed: number;
+  maxSpeed: number;
+  stopsCount: number;
+  points: Trip["points"];
+  events: Trip["events"];
+}
+
 export interface IStorage {
   getVehicles(): Promise<Vehicle[]>;
   getVehicle(id: string): Promise<Vehicle | undefined>;
+  getVehicleByLicensePlate(licensePlate: string): Promise<Vehicle | undefined>;
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle | undefined>;
   deleteVehicle(id: string): Promise<boolean>;
@@ -27,6 +42,7 @@ export interface IStorage {
   clearReadAlerts(): Promise<void>;
   
   getTrips(vehicleId: string, startDate: string, endDate: string): Promise<Trip[]>;
+  createTrip(trip: InsertTrip): Promise<Trip>;
   
   getSpeedViolations(startDate: string, endDate: string): Promise<SpeedViolation[]>;
   getSpeedStats(startDate: string, endDate: string): Promise<VehicleStats>;
@@ -504,6 +520,12 @@ export class MemStorage implements IStorage {
     return this.vehicles.get(id);
   }
 
+  async getVehicleByLicensePlate(licensePlate: string): Promise<Vehicle | undefined> {
+    return Array.from(this.vehicles.values()).find(
+      (v) => v.licensePlate.toLowerCase() === licensePlate.toLowerCase()
+    );
+  }
+
   async createVehicle(vehicle: InsertVehicle): Promise<Vehicle> {
     const id = randomUUID();
     const newVehicle: Vehicle = { ...vehicle, id };
@@ -597,6 +619,12 @@ export class MemStorage implements IStorage {
 
   async getTrips(vehicleId: string, startDate: string, endDate: string): Promise<Trip[]> {
     return [generateSampleTrip(vehicleId, startDate, endDate)];
+  }
+
+  async createTrip(trip: InsertTrip): Promise<Trip> {
+    const id = randomUUID();
+    const newTrip: Trip = { ...trip, id };
+    return newTrip;
   }
 
   async getSpeedViolations(startDate: string, endDate: string): Promise<SpeedViolation[]> {

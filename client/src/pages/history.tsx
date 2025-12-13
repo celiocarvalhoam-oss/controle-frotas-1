@@ -1,12 +1,12 @@
 import { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSearch } from "wouter";
 import { MapContainer, TileLayer, Polyline, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import { 
   Calendar as CalendarIcon, Clock, MapPin, Gauge, 
   Route, Timer, PauseCircle, TrendingUp, Download,
-  Flag, CheckCircle2, AlertTriangle, Shield, Play
+  Flag, CheckCircle2, AlertTriangle, Shield, Play, Save, Loader2
 } from "lucide-react";
 import { format, subDays, startOfDay, endOfDay } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -19,6 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import type { Vehicle, Trip, RouteEvent } from "@shared/schema";
 import "leaflet/dist/leaflet.css";
 
@@ -46,6 +47,8 @@ const stopIcon = L.divIcon({
 export default function History() {
   const searchParams = new URLSearchParams(useSearch());
   const vehicleIdParam = searchParams.get("vehicleId");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [selectedVehicleId, setSelectedVehicleId] = useState<string>(vehicleIdParam || "");
   const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
@@ -60,8 +63,69 @@ export default function History() {
 
   const { data: trips = [], isLoading: isLoadingTrips } = useQuery<Trip[]>({
     queryKey: ["/api/trips", selectedVehicleId, dateRange.from.toISOString(), dateRange.to.toISOString()],
+    queryFn: async () => {
+      const params = new URLSearchParams({
+        vehicleId: selectedVehicleId,
+        startDate: dateRange.from.toISOString(),
+        endDate: dateRange.to.toISOString(),
+      });
+      const response = await fetch(`/api/trips?${params.toString()}`);
+      if (!response.ok) {
+        throw new Error("Falha ao buscar viagens");
+      }
+      return response.json();
+    },
     enabled: !!selectedVehicleId,
   });
+
+  const saveTripMutation = useMutation({
+    mutationFn: async (trip: Omit<Trip, "id">) => {
+      const response = await fetch("/api/trips", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(trip),
+      });
+      if (!response.ok) {
+        throw new Error("Falha ao salvar viagem");
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: "Relatório salvo",
+        description: "O relatório de trajeto foi salvo com sucesso no banco de dados.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/trips"] });
+    },
+    onError: (error) => {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message || "Não foi possível salvar o relatório.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleSaveTrip = () => {
+    if (!selectedTrip) return;
+    
+    // Remove IDs dos eventos para criar novos registros
+    const eventsWithoutIds = selectedTrip.events.map(({ id, ...event }) => event);
+    
+    saveTripMutation.mutate({
+      vehicleId: selectedTrip.vehicleId,
+      startTime: selectedTrip.startTime,
+      endTime: selectedTrip.endTime,
+      totalDistance: selectedTrip.totalDistance,
+      travelTime: selectedTrip.travelTime,
+      stoppedTime: selectedTrip.stoppedTime,
+      averageSpeed: selectedTrip.averageSpeed,
+      maxSpeed: selectedTrip.maxSpeed,
+      stopsCount: selectedTrip.stopsCount,
+      points: selectedTrip.points,
+      events: eventsWithoutIds,
+    });
+  };
 
   const selectedTrip = trips[0];
 
@@ -180,10 +244,26 @@ export default function History() {
             </div>
 
             {selectedTrip && (
-              <Button variant="outline" className="gap-2 ml-auto" data-testid="button-export">
-                <Download className="h-4 w-4" />
-                Exportar
-              </Button>
+              <div className="flex gap-2 ml-auto">
+                <Button 
+                  variant="default" 
+                  className="gap-2" 
+                  onClick={handleSaveTrip}
+                  disabled={saveTripMutation.isPending}
+                  data-testid="button-save"
+                >
+                  {saveTripMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4" />
+                  )}
+                  Salvar Relatório
+                </Button>
+                <Button variant="outline" className="gap-2" data-testid="button-export">
+                  <Download className="h-4 w-4" />
+                  Exportar
+                </Button>
+              </div>
             )}
           </div>
         </div>

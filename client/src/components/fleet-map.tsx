@@ -1,9 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, useMap, Polyline, Circle, Polygon } from "react-leaflet";
 import { LatLngBounds, LatLng } from "leaflet";
-import { ZoomIn, ZoomOut, Crosshair, Maximize2, Layers } from "lucide-react";
+import { 
+  ZoomIn, ZoomOut, Crosshair, Maximize2, Layers, 
+  Map as MapIcon, Satellite, Navigation2, Gauge
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { VehicleMarker } from "./vehicle-marker";
+import { cn } from "@/lib/utils";
 import type { Vehicle, Geofence } from "@shared/schema";
 import "leaflet/dist/leaflet.css";
 
@@ -46,42 +51,45 @@ function MapControls({ onZoomIn, onZoomOut, onCenter, onFullscreen }: {
 }) {
   return (
     <div className="absolute top-4 right-4 z-[1000] flex flex-col gap-2">
-      <Button
-        variant="secondary"
-        size="icon"
-        onClick={onZoomIn}
-        className="h-10 w-10 rounded-full shadow-lg"
-        data-testid="button-zoom-in"
-      >
-        <ZoomIn className="h-5 w-5" />
-      </Button>
-      <Button
-        variant="secondary"
-        size="icon"
-        onClick={onZoomOut}
-        className="h-10 w-10 rounded-full shadow-lg"
-        data-testid="button-zoom-out"
-      >
-        <ZoomOut className="h-5 w-5" />
-      </Button>
-      <Button
-        variant="secondary"
-        size="icon"
-        onClick={onCenter}
-        className="h-10 w-10 rounded-full shadow-lg"
-        data-testid="button-center"
-      >
-        <Crosshair className="h-5 w-5" />
-      </Button>
-      <Button
-        variant="secondary"
-        size="icon"
-        onClick={onFullscreen}
-        className="h-10 w-10 rounded-full shadow-lg"
-        data-testid="button-fullscreen"
-      >
-        <Maximize2 className="h-5 w-5" />
-      </Button>
+      <div className="bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border border-border/50 p-1.5 flex flex-col gap-1">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onZoomIn}
+          className="h-9 w-9 rounded-xl hover:bg-muted"
+          data-testid="button-zoom-in"
+        >
+          <ZoomIn className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onZoomOut}
+          className="h-9 w-9 rounded-xl hover:bg-muted"
+          data-testid="button-zoom-out"
+        >
+          <ZoomOut className="h-4 w-4" />
+        </Button>
+        <div className="h-px bg-border mx-1.5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onCenter}
+          className="h-9 w-9 rounded-xl hover:bg-muted"
+          data-testid="button-center"
+        >
+          <Crosshair className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={onFullscreen}
+          className="h-9 w-9 rounded-xl hover:bg-muted"
+          data-testid="button-fullscreen"
+        >
+          <Maximize2 className="h-4 w-4" />
+        </Button>
+      </div>
     </div>
   );
 }
@@ -98,8 +106,9 @@ function GeofenceOverlay({ geofence }: { geofence: Geofence }) {
         pathOptions={{
           color,
           fillColor,
-          fillOpacity: 0.2,
+          fillOpacity: 0.15,
           weight: 2,
+          dashArray: "8, 4",
         }}
       />
     );
@@ -113,8 +122,9 @@ function GeofenceOverlay({ geofence }: { geofence: Geofence }) {
         pathOptions={{
           color,
           fillColor,
-          fillOpacity: 0.2,
+          fillOpacity: 0.15,
           weight: 2,
+          dashArray: "8, 4",
         }}
       />
     );
@@ -177,6 +187,8 @@ export function FleetMap({
     ? "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
     : "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}";
 
+  const hasSpeedAlert = selectedVehicle && selectedVehicle.currentSpeed > selectedVehicle.speedLimit;
+
   return (
     <div className="relative h-full w-full">
       <MapContainer
@@ -202,9 +214,10 @@ export function FleetMap({
             positions={recentTrail.map(p => [p.latitude, p.longitude] as [number, number])}
             pathOptions={{
               color: "#3b82f6",
-              weight: 3,
-              opacity: 0.7,
-              dashArray: "5, 10",
+              weight: 4,
+              opacity: 0.8,
+              lineCap: "round",
+              lineJoin: "round",
             }}
           />
         )}
@@ -226,33 +239,97 @@ export function FleetMap({
         onFullscreen={handleFullscreen}
       />
 
+      {/* Layer Toggle */}
       <div className="absolute bottom-4 left-4 z-[1000]">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => setMapLayer(mapLayer === "street" ? "satellite" : "street")}
-          className="shadow-lg gap-2"
-          data-testid="button-toggle-layer"
-        >
-          <Layers className="h-4 w-4" />
-          {mapLayer === "street" ? "Satélite" : "Mapa"}
-        </Button>
+        <div className="bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border border-border/50 p-1 flex gap-1">
+          <Button
+            variant={mapLayer === "street" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setMapLayer("street")}
+            className={cn(
+              "gap-2 rounded-xl h-9 px-3",
+              mapLayer === "street" && "bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
+            data-testid="button-map-layer"
+          >
+            <MapIcon className="h-4 w-4" />
+            <span className="hidden sm:inline text-xs font-medium">Mapa</span>
+          </Button>
+          <Button
+            variant={mapLayer === "satellite" ? "secondary" : "ghost"}
+            size="sm"
+            onClick={() => setMapLayer("satellite")}
+            className={cn(
+              "gap-2 rounded-xl h-9 px-3",
+              mapLayer === "satellite" && "bg-primary text-primary-foreground hover:bg-primary/90"
+            )}
+            data-testid="button-satellite-layer"
+          >
+            <Satellite className="h-4 w-4" />
+            <span className="hidden sm:inline text-xs font-medium">Satélite</span>
+          </Button>
+        </div>
       </div>
 
+      {/* Selected Vehicle Info Card */}
       {selectedVehicle && (
-        <div className="absolute bottom-4 right-4 z-[1000] bg-card p-3 rounded-lg shadow-lg min-w-[200px]">
-          <div className="text-xs text-muted-foreground uppercase tracking-wide mb-2">
-            Veículo Selecionado
-          </div>
-          <div className="font-semibold">{selectedVehicle.name}</div>
-          <div className="grid grid-cols-2 gap-2 mt-2 text-sm">
-            <div>
-              <span className="text-muted-foreground">Velocidade:</span>
-              <span className="font-mono ml-1">{selectedVehicle.currentSpeed} km/h</span>
+        <div className="absolute bottom-4 right-4 z-[1000] animate-fade-in">
+          <div className={cn(
+            "bg-card/95 backdrop-blur-sm rounded-2xl shadow-lg border p-4 min-w-[220px]",
+            hasSpeedAlert ? "border-red-500/50" : "border-border/50"
+          )}>
+            <div className="flex items-start justify-between gap-3 mb-3">
+              <div>
+                <div className="font-semibold text-sm">{selectedVehicle.name}</div>
+                <div className="text-xs text-muted-foreground">{selectedVehicle.licensePlate}</div>
+              </div>
+              <Badge 
+                variant="secondary" 
+                className={cn(
+                  "text-[10px]",
+                  selectedVehicle.status === "moving" && "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-400",
+                  selectedVehicle.status === "stopped" && "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400",
+                  selectedVehicle.status === "offline" && "bg-slate-100 text-slate-600 dark:bg-slate-900 dark:text-slate-400"
+                )}
+              >
+                {selectedVehicle.status === "moving" ? "Movimento" : 
+                 selectedVehicle.status === "stopped" ? "Parado" : "Offline"}
+              </Badge>
             </div>
-            <div>
-              <span className="text-muted-foreground">Direção:</span>
-              <span className="font-mono ml-1">{selectedVehicle.heading}°</span>
+            
+            <div className="grid grid-cols-2 gap-3">
+              <div className="flex items-center gap-2">
+                <div className={cn(
+                  "w-8 h-8 rounded-lg flex items-center justify-center",
+                  hasSpeedAlert ? "bg-red-100 dark:bg-red-950/50" : "bg-muted"
+                )}>
+                  <Gauge className={cn(
+                    "h-4 w-4",
+                    hasSpeedAlert ? "text-red-600 dark:text-red-400" : "text-muted-foreground"
+                  )} />
+                </div>
+                <div>
+                  <div className={cn(
+                    "font-mono font-bold text-sm",
+                    hasSpeedAlert && "text-red-600 dark:text-red-400"
+                  )}>
+                    {selectedVehicle.currentSpeed}
+                  </div>
+                  <div className="text-[10px] text-muted-foreground">km/h</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-muted flex items-center justify-center">
+                  <Navigation2 
+                    className="h-4 w-4 text-muted-foreground" 
+                    style={{ transform: `rotate(${selectedVehicle.heading}deg)` }}
+                  />
+                </div>
+                <div>
+                  <div className="font-mono font-bold text-sm">{selectedVehicle.heading}°</div>
+                  <div className="text-[10px] text-muted-foreground">Direção</div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
