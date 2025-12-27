@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { 
-  Map, History, Shield, Bell, BarChart3, Truck, LogOut
+  Map, History, Shield, Bell, BarChart3, Truck, LogOut, CarFront, Activity, Zap
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
