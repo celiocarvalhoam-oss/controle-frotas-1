@@ -10,17 +10,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useQuery } from "@tanstack/react-query";
 import { 
-  Map, History, Shield, Bell, BarChart3, Truck, CarFront, 
-  Activity, Zap
+  Map, History, Shield, Bell, BarChart3, Truck, LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+
+import { AuthProvider } from "@/components/auth-provider";
+import { AuthGuard, PublicOnly } from "@/components/auth-guard";
+import { useAuth } from "@/hooks/use-auth";
 
 import Dashboard from "@/pages/dashboard";
 import HistoryPage from "@/pages/history";
 import GeofencesPage from "@/pages/geofences";
 import AlertsPage from "@/pages/alerts";
 import ReportsPage from "@/pages/reports";
-import VehiclesPage from "@/pages/vehicles";
+import LoginPage from "@/pages/login";
 import NotFound from "@/pages/not-found";
 
 import type { Alert } from "@shared/schema";
@@ -116,21 +119,65 @@ function Navigation() {
           <span className="font-medium">Live</span>
         </div>
         <ThemeToggle />
+        <UserMenu />
       </div>
     </header>
+  );
+}
+
+function UserMenu() {
+  const { user, signOut, isAuthenticated } = useAuth();
+  
+  if (!isAuthenticated) return null;
+  
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-sm text-muted-foreground hidden md:block">
+        {user?.username || user?.email}
+      </span>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={() => signOut()}
+        title="Sair"
+      >
+        <LogOut className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
+
+function ProtectedRoutes() {
+  return (
+    <AuthGuard>
+      <div className="flex flex-col h-screen">
+        <Navigation />
+        <main className="flex-1 overflow-hidden">
+          <Switch>
+            <Route path="/" component={Dashboard} />
+            <Route path="/history" component={HistoryPage} />
+            <Route path="/geofences" component={GeofencesPage} />
+            <Route path="/alerts" component={AlertsPage} />
+            <Route path="/reports" component={ReportsPage} />
+            <Route component={NotFound} />
+          </Switch>
+        </main>
+      </div>
+    </AuthGuard>
   );
 }
 
 function Router() {
   return (
     <Switch>
-      <Route path="/" component={Dashboard} />
-      <Route path="/vehicles" component={VehiclesPage} />
-      <Route path="/history" component={HistoryPage} />
-      <Route path="/geofences" component={GeofencesPage} />
-      <Route path="/alerts" component={AlertsPage} />
-      <Route path="/reports" component={ReportsPage} />
-      <Route component={NotFound} />
+      <Route path="/login">
+        <PublicOnly>
+          <LoginPage />
+        </PublicOnly>
+      </Route>
+      <Route>
+        <ProtectedRoutes />
+      </Route>
     </Switch>
   );
 }
@@ -139,15 +186,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-        <TooltipProvider delayDuration={200}>
-          <div className="flex flex-col h-screen bg-background">
-            <Navigation />
-            <main className="flex-1 overflow-hidden">
-              <Router />
-            </main>
-          </div>
-          <Toaster />
-        </TooltipProvider>
+        <AuthProvider>
+          <TooltipProvider>
+            <Router />
+            <Toaster />
+          </TooltipProvider>
+        </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

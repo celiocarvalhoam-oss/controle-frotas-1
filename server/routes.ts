@@ -21,28 +21,41 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
 
-  const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
+  // Só inicia WebSocket se Supabase NÃO estiver configurado
+  // Quando Supabase está configurado, usamos Supabase Realtime no frontend
+  const useSupabaseRealtime = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
+  
+  if (!useSupabaseRealtime) {
+    const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
-  storage.onVehicleUpdate(broadcastVehicles);
+    // Só registra callback se storage for MemStorage (tem método onVehicleUpdate)
+    if ('onVehicleUpdate' in storage) {
+      (storage as any).onVehicleUpdate(broadcastVehicles);
+    }
 
-  wss.on("connection", (ws) => {
-    clients.add(ws);
-    console.log("WebSocket client connected");
+    wss.on("connection", (ws) => {
+      clients.add(ws);
+      console.log("WebSocket client connected");
 
-    storage.getVehicles().then(vehicles => {
-      ws.send(JSON.stringify({ type: "vehicles", data: vehicles }));
+      storage.getVehicles().then(vehicles => {
+        ws.send(JSON.stringify({ type: "vehicles", data: vehicles }));
+      });
+
+      ws.on("close", () => {
+        clients.delete(ws);
+        console.log("WebSocket client disconnected");
+      });
+
+      ws.on("error", (error) => {
+        console.error("WebSocket error:", error);
+        clients.delete(ws);
+      });
     });
-
-    ws.on("close", () => {
-      clients.delete(ws);
-      console.log("WebSocket client disconnected");
-    });
-
-    ws.on("error", (error) => {
-      console.error("WebSocket error:", error);
-      clients.delete(ws);
-    });
-  });
+    
+    console.log("WebSocket server started (Supabase not configured)");
+  } else {
+    console.log("Using Supabase Realtime (WebSocket disabled)");
+  }
 
   app.get("/api/vehicles", async (req, res) => {
     try {
@@ -232,6 +245,11 @@ export async function registerRoutes(
       const end = endDate ? String(endDate) : new Date().toISOString();
       
       const trips = await storage.getTrips(vehicleId, start, end);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/c8f2aa62-da2a-4442-b8d5-cb9e09f709d3',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'routes.ts:250',message:'getTrips called',data:{vehicleId,startDate:start,endDate:end,tripsCount:trips.length,firstTripPointsCount:trips[0]?.points?.length||0,storageConstructorName:storage.constructor.name},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'E'})}).catch(()=>{});
+      // #endregion
+      
       res.json(trips);
     } catch (error) {
       res.status(500).json({ error: "Failed to fetch trips" });

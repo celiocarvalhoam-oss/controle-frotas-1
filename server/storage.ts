@@ -24,6 +24,7 @@ export interface IStorage {
   getVehicles(): Promise<Vehicle[]>;
   getVehicle(id: string): Promise<Vehicle | undefined>;
   getVehicleByLicensePlate(licensePlate: string): Promise<Vehicle | undefined>;
+  getVehicleByLicensePlate(licensePlate: string): Promise<Vehicle | undefined>;
   createVehicle(vehicle: InsertVehicle): Promise<Vehicle>;
   updateVehicle(id: string, updates: Partial<Vehicle>): Promise<Vehicle | undefined>;
   deleteVehicle(id: string): Promise<boolean>;
