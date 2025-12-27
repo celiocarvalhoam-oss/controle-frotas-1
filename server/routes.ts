@@ -17,15 +17,15 @@ function broadcastVehicles(vehicles: unknown[]) {
 }
 
 export async function registerRoutes(
-  httpServer: Server,
+  httpServer: Server | undefined,
   app: Express
-): Promise<Server> {
+): Promise<Server | undefined> {
 
   // Só inicia WebSocket se Supabase NÃO estiver configurado
   // Quando Supabase está configurado, usamos Supabase Realtime no frontend
   const useSupabaseRealtime = process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY;
   
-  if (!useSupabaseRealtime) {
+  if (httpServer && !useSupabaseRealtime) {
     const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 
     // Só registra callback se storage for MemStorage (tem método onVehicleUpdate)
@@ -53,7 +53,7 @@ export async function registerRoutes(
     });
     
     console.log("WebSocket server started (Supabase not configured)");
-  } else {
+  } else if (useSupabaseRealtime) {
     console.log("Using Supabase Realtime (WebSocket disabled)");
   }
 
