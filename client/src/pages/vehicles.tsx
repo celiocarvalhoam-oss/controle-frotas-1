@@ -281,7 +281,10 @@ export default function VehiclesPage() {
 
         {/* Cards de estatísticas */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <Card>
+          <Card 
+            className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === "all" && "border-primary ring-1 ring-primary")}
+            onClick={() => setStatusFilter("all")}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
@@ -294,7 +297,10 @@ export default function VehiclesPage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === "moving" && "border-green-500 ring-1 ring-green-500")}
+            onClick={() => setStatusFilter("moving")}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
@@ -307,7 +313,10 @@ export default function VehiclesPage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === "stopped" && "border-amber-500 ring-1 ring-amber-500")}
+            onClick={() => setStatusFilter("stopped")}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-amber-500/10 flex items-center justify-center">
@@ -320,7 +329,10 @@ export default function VehiclesPage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === "idle" && "border-blue-500 ring-1 ring-blue-500")}
+            onClick={() => setStatusFilter("idle")}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
@@ -333,7 +345,10 @@ export default function VehiclesPage() {
               </div>
             </CardContent>
           </Card>
-          <Card>
+          <Card
+            className={cn("cursor-pointer transition-all hover:shadow-md", statusFilter === "offline" && "border-gray-500 ring-1 ring-gray-500")}
+            onClick={() => setStatusFilter("offline")}
+          >
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="h-10 w-10 rounded-lg bg-gray-500/10 flex items-center justify-center">
